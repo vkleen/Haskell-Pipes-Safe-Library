@@ -322,14 +322,15 @@ instance (MonadIO m, MonadCatch m, MonadMask m) => MonadSafe (SafeT m) where
     release key = do
         ioref <- SafeT R.ask
 #if MIN_VERSION_base(4,6,0)
-        liftIO $ atomicModifyIORef' ioref $ \val ->
+        x <- liftIO $ atomicModifyIORef' ioref $ \val ->
 #else
-        liftIO $ atomicModifyIORef ioref $ \val ->
+        x <- liftIO $ atomicModifyIORef ioref $ \val ->
 #endif
             case val of
                 Nothing -> error "release: SafeT block is closed"
                 Just (Finalizers n fs) ->
-                    (Just $! Finalizers n (M.delete (unlock key) fs), ())
+                    (Just $! Finalizers n (M.delete (unlock key) fs), fs M.! unlock key)
+        lift x
 
 instance (MonadSafe m) => MonadSafe (Proxy a' a b' b m) where
     type Base (Proxy a' a b' b m) = Base m
